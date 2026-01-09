@@ -1,0 +1,23 @@
+{
+  "actions": {
+    "RESTART_APACHE": {
+      "risk_level": "HIGH",
+      "requires_approval": true,
+      "description": "Restart Apache web server - may cause service interruption"
+    },
+    "CLEAR_TEMP_CACHE": {
+      "risk_level": "LOW",
+      "requires_approval": false,
+      "description": "Clear temporary cache files - low risk operation"
+    },
+    "ESCALATE": {
+      "risk_level": "MEDIUM",
+      "requires_approval": false,
+      "description": "Escalate incident to human operator - no automated action"
+    }
+  },
+  "dry_run_mode": true,
+  "database_file": "incidents.db",
+  "log_file": "server.log"
+}
+

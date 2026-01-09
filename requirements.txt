@@ -1,0 +1,4 @@
+requests>=2.31.0
+# Note: sqlite3, json, os, sys, time, datetime, re are built-in Python modules
+# For vector embeddings (future enhancement): sentence-transformers, faiss-cpu
+

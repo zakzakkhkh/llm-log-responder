@@ -1,0 +1,45 @@
+{
+  "tools": [
+    {
+      "name": "RESTART_APACHE",
+      "description": "Restart the Apache web server service. This action may cause temporary service interruption.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "risk_level": "HIGH",
+      "requires_approval": true
+    },
+    {
+      "name": "CLEAR_TEMP_CACHE",
+      "description": "Clear temporary cache files to free up disk space. Low risk operation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "risk_level": "LOW",
+      "requires_approval": false
+    },
+    {
+      "name": "ESCALATE",
+      "description": "Escalate the incident to human operator for manual investigation. No automated remediation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for escalation"
+          }
+        },
+        "required": []
+      },
+      "risk_level": "MEDIUM",
+      "requires_approval": false
+    }
+  ],
+  "version": "1.0.0",
+  "protocol": "MCP"
+}
+

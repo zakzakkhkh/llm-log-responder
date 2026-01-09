@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated Logs
+mcp_audit.log
+# Note: server.log is kept as an input file for monitoring
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# API Keys (security)
+api_key.txt
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (keep private)
+LLM_BACKED_LOG_SUMMARIZER.pdf
