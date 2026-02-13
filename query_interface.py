@@ -17,10 +17,11 @@ from database import (
     get_open_incidents
 )
 from llm_api_caller import call_llm
+from rag_framework import get_rag_summarizer
 
 def summarize_errors_by_time_window(hours: int = 1) -> str:
     """
-    Summarize errors in the last N hours
+    Summarize errors in the last N hours using RAG
     Matches assignment requirement: "summarize last hour's errors"
     """
     errors = get_errors_by_time_window(hours)
@@ -37,25 +38,21 @@ def summarize_errors_by_time_window(hours: int = 1) -> str:
         else:
             return f"No errors found in the last {hours} hour(s). System appears to be operating normally."
     
-    # Collect all error log lines
-    error_logs = "\n".join([incident['log_line'] for incident in errors])
-    
-    # Use LLM to summarize
-    summary_prompt = f"""
-    Summarize the following errors detected in the last {hours} hour(s):
-    
-    {error_logs}
-    
-    Provide a concise summary of the main issues and their root causes.
-    """
-    
-    result = call_llm(error_logs)
-    if result and 'summary' in result:
-        summary = result['summary']
-        return f"Summary of errors in last {hours} hour(s) ({len(errors)} incidents):\n{summary}"
-    else:
-        # Fallback summary
-        return f"Found {len(errors)} error(s) in the last {hours} hour(s). Details: {error_logs[:500]}"
+    # Use RAG summarizer for enhanced context retrieval
+    try:
+        rag_summarizer = get_rag_summarizer()
+        summary = rag_summarizer.summarize_time_window(hours)
+        return f"RAG-Enhanced Summary of errors in last {hours} hour(s) ({len(errors)} incidents):\n{summary}"
+    except Exception as e:
+        # Fallback to direct LLM if RAG fails
+        print(f"[QUERY] RAG summarization failed: {e}, falling back to direct LLM")
+        error_logs = "\n".join([incident['log_line'] for incident in errors])
+        result = call_llm(error_logs)
+        if result and 'summary' in result:
+            summary = result['summary']
+            return f"Summary of errors in last {hours} hour(s) ({len(errors)} incidents):\n{summary}"
+        else:
+            return f"Found {len(errors)} error(s) in the last {hours} hour(s). Details: {error_logs[:500]}"
 
 def query_suspicious_events(pattern: str = "auth", hours: int = 24) -> List[Dict]:
     """

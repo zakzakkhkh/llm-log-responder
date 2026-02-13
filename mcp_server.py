@@ -15,6 +15,7 @@ from database import record_action
 from approval_gate import request_approval, requires_approval, is_dry_run_mode
 
 AUDIT_LOG_FILE = "mcp_audit.log"
+_quiet = os.environ.get("DEMO") == "1"
 
 def log_audit_event(tool_name: str, incident_id: Optional[int], status: str, 
                     approved_by: Optional[str] = None, error: Optional[str] = None):
@@ -34,8 +35,8 @@ def log_audit_event(tool_name: str, incident_id: Optional[int], status: str,
     # Write to audit log file
     with open(AUDIT_LOG_FILE, 'a') as f:
         f.write(json.dumps(audit_entry) + "\n")
-    
-    print(f"[MCP AUDIT] {tool_name} - Status: {status} - Incident: {incident_id}")
+    if not _quiet:
+        print(f"[MCP AUDIT] {tool_name} - Status: {status} - Incident: {incident_id}")
 
 def execute_mcp_tool(tool_name: str, incident_id: Optional[int] = None, 
                      summary: Optional[str] = None, parameters: Optional[Dict] = None) -> Tuple[bool, str]:
@@ -66,16 +67,32 @@ def execute_mcp_tool(tool_name: str, incident_id: Optional[int] = None,
         log_audit_event(tool_name, incident_id, "dry_run", approved_by=approved_by)
         return (True, f"[DRY RUN] Tool '{tool_name}' would be executed (approved by {approved_by})")
     
-    # Step 4: Execute the actual tool via actions.sh
+    # Step 4: Execute the actual tool via actions.sh with seccomp sandboxing
     import subprocess
     try:
-        # Call actions.sh with the tool name
-        result = subprocess.run(
-            ["./actions.sh", tool_name],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        # Try to use sandbox executor if available
+        try:
+            from sandbox_executor import get_sandbox_executor
+            sandbox = get_sandbox_executor()
+            # Execute in sandbox for security
+            success, stdout, stderr = sandbox.execute_sandboxed(
+                f"./actions.sh {tool_name}",
+                timeout=30
+            )
+            
+            result = type('Result', (), {
+                'returncode': 0 if success else 1,
+                'stdout': stdout,
+                'stderr': stderr
+            })()
+        except ImportError:
+            # Fallback to basic subprocess if sandbox not available
+            result = subprocess.run(
+                ["./actions.sh", tool_name],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
         
         if result.returncode == 0:
             # Record action in database

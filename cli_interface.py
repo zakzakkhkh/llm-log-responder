@@ -50,13 +50,25 @@ def main():
     
     if command == "query":
         if len(sys.argv) < 3:
-            print("Error: Query required")
-            print("Usage: python3 cli_interface.py query '<your query>'")
+            print("Error: Query required", flush=True)
+            print("Usage: python3 cli_interface.py query '<your query>'", flush=True)
             sys.exit(1)
         
         query = " ".join(sys.argv[2:])
-        result = interactive_query(query)
-        print(result)
+        # Use stderr so output is always visible (stdout can be buffered or broken in some WSL setups)
+        sep = "=" * 60
+        sys.stderr.write("\nRunning query: \"{}\"...\n".format(query))
+        sys.stderr.write(sep + "\nQUERY RESULT\n" + sep + "\n")
+        sys.stderr.flush()
+        try:
+            result = interactive_query(query)
+            out = result if result is not None else "(no output)"
+            sys.stderr.write(out + "\n")
+            sys.stderr.write(sep + "\n\n")
+            sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write("Error: {}\n".format(e))
+            sys.stderr.flush()
     
     elif command == "suggest-rules":
         print("Analyzing log patterns and suggesting alert rules...\n")

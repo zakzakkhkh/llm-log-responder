@@ -1,0 +1,5 @@
+# Minimal deps for Quick Demo (no python-seccomp).
+# Use if: pip3 install -r requirements.txt fails with "python-seccomp" or "No matching distribution".
+requests>=2.31.0
+sentence-transformers>=2.2.0
+numpy>=1.24.0

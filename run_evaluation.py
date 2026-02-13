@@ -76,8 +76,13 @@ def run_comprehensive_evaluation(dataset_file: str, limit: Optional[int] = None)
     
     print(f"\nResults saved to: {output_file}\n")
     
-    # Print formatted report
+    # Print formatted report to terminal so demo audience sees it
     print_formatted_report(report)
+    det = report['dataset_evaluation']
+    print("\n>>> EVALUATION COMPLETE. Key metrics: Precision {}%, Recall {}%, F1-Score {}%, Avg latency {:.2f}s".format(
+        det['precision'], det['recall'], det['f1_score'], det['latency']['average']))
+    print("="*70 + "\n")
+    sys.stdout.flush()
     
     return report
 

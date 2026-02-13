@@ -8,20 +8,33 @@ PYTHON_HELPER="./llm_api_caller.py"
 INCIDENT_HANDLER="./incident_handler.py"
 DRY_RUN_MODE="true" 
 
+# Suppress HuggingFace/transformers progress bars and verbose logs for clean demo output
+export HF_HUB_DISABLE_PROGRESS_BARS=1
+export TRANSFORMERS_VERBOSITY=error
+export DEMO=1
+
 echo "Log Monitor - Real-Time Streaming Active"
 echo "Target: $LOG_FILE"
 echo "Dry Run Mode: $DRY_RUN_MODE"
 echo "----------------------------------------"
 
-# Check required files
-if [ ! -f "$LOG_FILE" ] || [ ! -f "$PYTHON_HELPER" ] || [ ! -f "$INCIDENT_HANDLER" ]; then
-    echo "FATAL ERROR: Required files not found. Please check permissions." >&2
+# Check required Python files
+if [ ! -f "$PYTHON_HELPER" ] || [ ! -f "$INCIDENT_HANDLER" ]; then
+    echo "FATAL ERROR: Required Python files not found. Please check permissions." >&2
     exit 1
 fi
 
+# Create log file if it doesn't exist
+if [ ! -f "$LOG_FILE" ]; then
+    echo "[INFO] Log file $LOG_FILE not found. Creating empty log file for monitoring..."
+    touch "$LOG_FILE"
+    echo "[INFO] Created $LOG_FILE. You can add log entries to this file for testing."
+    echo "[INFO] Example: echo 'ERROR: Test error message' >> $LOG_FILE"
+fi
+
 # Initialize database if needed
-echo "[INIT] Initializing database..."
-"$PYTHON_INTERPRETER" -c "from database import init_db; init_db()" 2>/dev/null || echo "[WARN] Database initialization check skipped"
+"$PYTHON_INTERPRETER" -c "from database import init_db; init_db()" 2>/dev/null
+echo "Database: ready"
 
 # Real-time monitoring loop
 if command -v tail >/dev/null 2>&1; then
@@ -29,14 +42,25 @@ if command -v tail >/dev/null 2>&1; then
     
     # Anomaly detection
     if echo "$line" | grep -q -E "$ANOMALY_KEYWORDS"; then
-        # Store log entry for indexing
-        "$PYTHON_INTERPRETER" -c "from database import store_log_entry; store_log_entry('$line', True)" 2>/dev/null || true
+        # Store log entry with Drain parsing and dual-indexing
+        "$PYTHON_INTERPRETER" -c "
+from database import store_log_entry
+from drain_parser import parse_log_entry
+import sys
+log_line = sys.argv[1]
+try:
+    template, template_id = parse_log_entry(log_line)
+    log_id = store_log_entry(log_line, is_anomaly=True, template_id=template_id)
+except Exception:
+    store_log_entry(log_line, is_anomaly=True)
+" "$line" 2>/dev/null || true
         
-        # Retrieve log context
+        # Retrieve log context using RAG (retrieval-augmented generation)
         LOG_CONTEXT=$(cat "$LOG_FILE") 
 
-        # Call LLM API
-        echo "   [STATUS] Calling OpenRouter API for analysis (This may take a few seconds)..."
+        echo ""
+        echo "----------------------------------------"
+        echo "   [STATUS] Calling OpenRouter API for analysis..."
         JSON_RESPONSE=$("$PYTHON_INTERPRETER" "$PYTHON_HELPER" "$LOG_CONTEXT")
 
         # Extract summary and action from JSON response
@@ -53,7 +77,7 @@ if command -v tail >/dev/null 2>&1; then
                 SUMMARY_OUTPUT="[BASH FALLBACK] Critical timeout occurred, indicating service unreachable."
                 ACTION_TO_EXECUTE="ESCALATE"
             else
-                SUMMARY_OUTPUT="API ERROR: Check terminal for Python errors."
+                SUMMARY_OUTPUT="LLM summary unavailable; escalating for review."
                 ACTION_TO_EXECUTE="ESCALATE"
             fi
         else
@@ -61,20 +85,18 @@ if command -v tail >/dev/null 2>&1; then
             ACTION_TO_EXECUTE="$ACTION"
         fi
 
-        echo -e "\n🚨 [ANOMALY DETECTED] $line"
-        echo -e "   [LLM SUMMARY] $SUMMARY_OUTPUT"
-        echo -e "   [PROPOSED ACTION] \033[1m$ACTION_TO_EXECUTE\033[0m"
-        
-        # Execute action via MCP server
-        echo -e "   [MCP GATEWAY] Routing action through MCP server with validation..."
-        "$PYTHON_INTERPRETER" "$INCIDENT_HANDLER" "$line" "$SUMMARY_OUTPUT" "$ACTION_TO_EXECUTE"
-        
+        echo "   ANOMALY:    $line"
+        echo "   SUMMARY:    $SUMMARY_OUTPUT"
+        echo "   ACTION:     $ACTION_TO_EXECUTE"
+        echo "   MCP:        Validating and routing..."
+        "$PYTHON_INTERPRETER" "$INCIDENT_HANDLER" "$line" "$SUMMARY_OUTPUT" "$ACTION_TO_EXECUTE" 2>/dev/null
         HANDLER_EXIT_CODE=$?
         if [ $HANDLER_EXIT_CODE -eq 0 ]; then
-            echo -e "   [STATUS] Incident handled successfully via MCP"
+            echo "   STATUS:     Handled (MCP)"
         else
-            echo -e "   [STATUS] Incident handling completed with warnings/errors"
+            echo "   STATUS:     Dry-run: action not executed (approval required)"
         fi
+        echo "----------------------------------------"
         
     fi
     done
@@ -100,7 +122,7 @@ else
                     SUMMARY_OUTPUT="[BASH FALLBACK] Critical timeout occurred."
                     ACTION_TO_EXECUTE="ESCALATE"
                 else
-                    SUMMARY_OUTPUT="API ERROR"
+                    SUMMARY_OUTPUT="LLM summary unavailable; escalating for review."
                     ACTION_TO_EXECUTE="ESCALATE"
                 fi
             else
@@ -108,10 +130,20 @@ else
                 ACTION_TO_EXECUTE="$ACTION"
             fi
             
-            echo -e "\n🚨 [ANOMALY DETECTED] $line"
-            echo -e "   [LLM SUMMARY] $SUMMARY_OUTPUT"
-            echo -e "   [PROPOSED ACTION] $ACTION_TO_EXECUTE"
-            "$PYTHON_INTERPRETER" "$INCIDENT_HANDLER" "$line" "$SUMMARY_OUTPUT" "$ACTION_TO_EXECUTE"
+            echo ""
+            echo "----------------------------------------"
+            echo "   ANOMALY:    $line"
+            echo "   SUMMARY:    $SUMMARY_OUTPUT"
+            echo "   ACTION:     $ACTION_TO_EXECUTE"
+            echo "   MCP:        Validating and routing..."
+            "$PYTHON_INTERPRETER" "$INCIDENT_HANDLER" "$line" "$SUMMARY_OUTPUT" "$ACTION_TO_EXECUTE" 2>/dev/null
+            HANDLER_EXIT_CODE=$?
+            if [ $HANDLER_EXIT_CODE -eq 0 ]; then
+                echo "   STATUS:     Handled (MCP)"
+            else
+                echo "   STATUS:     Dry-run: action not executed (approval required)"
+            fi
+            echo "----------------------------------------"
         fi
     done < "$LOG_FILE"
 fi

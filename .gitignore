@@ -12,7 +12,11 @@ __pycache__/
 
 # Generated Logs
 mcp_audit.log
-# Note: server.log is kept as an input file for monitoring
+server.log
+*.log
+
+# Evaluation Results
+evaluation_results_*.json
 
 # Environment
 .env

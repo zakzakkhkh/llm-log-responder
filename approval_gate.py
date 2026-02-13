@@ -10,6 +10,7 @@ import sys
 from typing import Optional, Tuple
 
 CONFIG_FILE = "config.json"
+_quiet = os.environ.get("DEMO") == "1"
 
 def load_config() -> dict:
     """Load configuration from config.json"""
@@ -53,8 +54,9 @@ def request_approval(action_name: str, summary: str, incident_context: Optional[
     
     # Check if dry_run_mode is enabled - if so, auto-approve for logging purposes but don't execute
     if config.get("dry_run_mode", True):
-        print(f"\n⚠️  [APPROVAL GATE] DRY RUN MODE: Action '{action_name}' would require approval")
-        print(f"   Summary: {summary}")
+        if not _quiet:
+            print(f"\n⚠️  [APPROVAL GATE] DRY RUN MODE: Action '{action_name}' would require approval")
+            print(f"   Summary: {summary}")
         return (False, "dry_run_mode")  # Return False to prevent execution
     
     # Check if approval is required

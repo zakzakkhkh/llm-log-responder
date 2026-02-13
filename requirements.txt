@@ -1,4 +1,9 @@
 requests>=2.31.0
+# RAG framework dependencies
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+# Note: python-seccomp is optional (seccomp sandboxing). If pip fails to install it
+# (e.g. on some WSL setups), skip it; the app falls back to unsandboxed execution.
+# To install when possible: pip install python-seccomp
 # Note: sqlite3, json, os, sys, time, datetime, re are built-in Python modules
-# For vector embeddings (future enhancement): sentence-transformers, faiss-cpu
 
